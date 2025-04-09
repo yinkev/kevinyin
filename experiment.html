@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Experiment // Data Stream Defender</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #0a0a1a;
+            --neon-cyan: #00ffff;
+            --neon-green: #39ff14;
+            --neon-pink: #ff00ff; /* Used for Angel's glow */
+            --neon-red: #ff1e56;
+            --text-color: #e0e0e0;
+            --canvas-max-width: 800px;
+            --grid-iso-color: rgba(0, 255, 255, 0.08);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'IBM Plex Mono', monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            padding: 1rem;
+            touch-action: manipulation;
+        }
+
+        .font-display { font-family: 'Press Start 2P', cursive; }
+
+        #game-ui {
+            width: 100%;
+            max-width: var(--canvas-max-width);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-family: 'Press Start 2P', cursive;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 5px var(--neon-cyan);
+            font-size: 0.8rem;
+        }
+         @media (min-width: 640px) { #game-ui { font-size: 1rem; } }
+
+        #game-canvas {
+            display: block;
+            background-color: #111;
+            border: 2px solid var(--neon-cyan);
+            box-shadow: 0 0 10px var(--neon-cyan);
+            max-width: 100%;
+            image-rendering: pixelated; /* Keep pixel art sharp */
+            touch-action: manipulation;
+        }
+
+        /* Removed .cell.player CSS rule - player is drawn on canvas */
+
+        /* Other styles remain the same */
+        #grid-background { position: fixed; top: -5%; left: -5%; width: 110%; height: 110%; background-image: linear-gradient(to right, var(--grid-iso-color) 1px, transparent 1px), linear-gradient(to bottom, var(--grid-iso-color) 1px, transparent 1px); background-size: 40px 40px; z-index: -2; pointer-events: none; transition: transform 0.15s ease-out; }
+        .particles { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: -3; }
+        .particle { position: absolute; background-color: var(--neon-cyan); opacity: 0; width: 2px; height: 2px; border-radius: 50%; box-shadow: 0 0 4px var(--neon-cyan); animation: float 20s infinite linear; }
+        .particle:nth-child(1) { top: 10%; left: 20%; animation-delay: 0s; animation-duration: 18s; } .particle:nth-child(2) { top: 50%; left: 80%; animation-delay: 1s; animation-duration: 22s; } .particle:nth-child(3) { top: 80%; left: 10%; animation-delay: 2s; animation-duration: 25s; } .particle:nth-child(4) { top: 30%; left: 50%; animation-delay: 3s; animation-duration: 15s; } .particle:nth-child(5) { top: 60%; left: 30%; animation-delay: 4s; animation-duration: 28s; } .particle:nth-child(6) { top: 90%; left: 90%; animation-delay: 5s; animation-duration: 19s; } .particle:nth-child(7) { top: 5%; left: 5%; animation-delay: 6s; animation-duration: 24s; } .particle:nth-child(8) { top: 70%; left: 65%; animation-delay: 7s; animation-duration: 16s; } .particle:nth-child(9) { top: 25%; left: 85%; animation-delay: 8s; animation-duration: 30s; } .particle:nth-child(10){ top: 45%; left: 15%; animation-delay: 9s; animation-duration: 21s; } .particle:nth-child(11){ top: 75%; left: 40%; animation-delay: 10s; animation-duration: 17s; } .particle:nth-child(12){ top: 15%; left: 70%; animation-delay: 11s; animation-duration: 26s; }
+        @keyframes float { 0% { transform: translateY(0) translateX(0); opacity: 0; } 10%, 90% { opacity: 0.4; } 100% { transform: translateY(-100vh) translateX(15vw) rotate(30deg); opacity: 0; } }
+        body::before { content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle 400px at var(--mouse-x) var(--mouse-y), rgba(0, 255, 255, 0.06), transparent); z-index: -1; pointer-events: none; transition: background 0.2s ease-out; }
+        .scanline-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.2), rgba(0,0,0,0.2) 1px, transparent 1px, transparent 3px); pointer-events: none; z-index: 100; opacity: 0.5; animation: scanline-flicker 12s infinite linear; }
+        @keyframes scanline-flicker { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.4; } }
+
+    </style>
+</head>
+<body class="flex flex-col items-center justify-start min-h-screen p-4">
+
+    <h1 class="font-display text-xl sm:text-2xl text-glow-cyan my-2 text-center">Data Stream Defender</h1>
+
+    <div id="game-ui">
+        <span id="score">SCORE: 0</span>
+        <span id="status">STATUS: OK</span>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <div class="text-xs text-gray-400 mt-2 text-center">
+        Use WASD/Arrows to Move. Auto-fires.<br>
+        Touch: Drag/Hold direction relative to player. Auto-fires.
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const statusElement = document.getElementById('status');
+
+        // --- Game Settings ---
+        const playerBaseSize = 24; // Base size for drawing player sprite
+        const playerSpeed = 3;
+        const playerColor = getComputedStyle(document.documentElement).getPropertyValue('--neon-green');
+        const projectileColor = getComputedStyle(document.documentElement).getPropertyValue('--neon-cyan');
+        const projectileSpeed = 5;
+        const projectileSize = { width: 4, height: 4 };
+        const fireRate = 180;
+
+        const enemyColor = getComputedStyle(document.documentElement).getPropertyValue('--neon-pink');
+        const enemyBaseSize = 24; // Base size for drawing enemy sprite
+        const enemySpeed = 1.5;
+        const enemySpawnRate = 1200;
+
+        const isoAngle = Math.PI / 6;
+        const isoCos = Math.cos(isoAngle);
+        const isoSin = Math.sin(isoAngle);
+        const tileWidth = 40;
+
+        let player = {};
+        let projectiles = [];
+        let enemies = [];
+        let score = 0;
+        let lastFireTime = 0;
+        let lastEnemySpawn = 0;
+        let gameActive = true;
+        let animationFrameId = null;
+
+        let keys = {};
+        let touchMoveDir = { x: 0, y: 0 };
+        let isTouching = false;
+
+        // --- Asset Loading ---
+        let stitchImage = new Image();
+        let angelImage = new Image();
+        let stitchImageLoaded = false;
+        let angelImageLoaded = false;
+
+        // Stitch SVG Data URL (24x24 - same as previous CSS attempt)
+        const stitchSvgData = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' shape-rendering='crispEdges'%3E%3C!-- Ears Outline (Dark Blue) --%3E%3Crect x='6' y='0' width='1' height='1' fill='%234682B4'/%3E%3Crect x='5' y='1' width='1' height='1' fill='%234682B4'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%234682B4'/%3E%3Crect x='3' y='3' width='1' height='2' fill='%234682B4'/%3E%3Crect x='2' y='5' width='1' height='3' fill='%234682B4'/%3E%3Crect x='3' y='8' width='1' height='1' fill='%234682B4'/%3E%3Crect x='17' y='0' width='1' height='1' fill='%234682B4'/%3E%3Crect x='18' y='1' width='1' height='1' fill='%234682B4'/%3E%3Crect x='19' y='2' width='1' height='1' fill='%234682B4'/%3E%3Crect x='20' y='3' width='1' height='2' fill='%234682B4'/%3E%3Crect x='21' y='5' width='1' height='3' fill='%234682B4'/%3E%3Crect x='20' y='8' width='1' height='1' fill='%234682B4'/%3E%3C!-- Ears Inner (Pink) --%3E%3Crect x='7' y='1' width='1' height='1' fill='%23FFB6C1'/%3E%3Crect x='6' y='2' width='2' height='1' fill='%23FFB6C1'/%3E%3Crect x='5' y='3' width='3' height='1' fill='%23FFB6C1'/%3E%3Crect x='4' y='4' width='4' height='2' fill='%23FFB6C1'/%3E%3Crect x='3' y='6' width='4' height='2' fill='%23FFB6C1'/%3E%3Crect x='16' y='1' width='1' height='1' fill='%23FFB6C1'/%3E%3Crect x='16' y='2' width='2' height='1' fill='%23FFB6C1'/%3E%3Crect x='16' y='3' width='3' height='1' fill='%23FFB6C1'/%3E%3Crect x='16' y='4' width='4' height='2' fill='%23FFB6C1'/%3E%3Crect x='17' y='6' width='4' height='2' fill='%23FFB6C1'/%3E%3C!-- Head Top (Mid Blue) --%3E%3Crect x='7' y='2' width='10' height='1' fill='%236495ED'/%3E%3Crect x='8' y='1' width='8' height='1' fill='%236495ED'/%3E%3C!-- Head Main (Mid Blue) --%3E%3Crect x='4' y='3' width='1' height='1' fill='%236495ED'/%3E%3Crect x='8' y='3' width='8' height='1' fill='%236495ED'/%3E%3Crect x='19' y='3' width='1' height='1' fill='%236495ED'/%3E%3Crect x='8' y='4' width='8' height='1' fill='%236495ED'/%3E%3Crect x='7' y='5' width='10' height='1' fill='%236495ED'/%3E%3Crect x='7' y='6' width='1' height='1' fill='%236495ED'/%3E%3Crect x='11' y='6' width='2' height='1' fill='%236495ED'/%3E%3Crect x='16' y='6' width='1' height='1' fill='%236495ED'/%3E%3Crect x='4' y='7' width='3' height='1' fill='%236495ED'/%3E%3Crect x='17' y='7' width='3' height='1' fill='%236495ED'/%3E%3Crect x='4' y='8' width='1' height='1' fill='%236495ED'/%3E%3Crect x='8' y='8' width='8' height='1' fill='%236495ED'/%3E%3Crect x='19' y='8' width='1' height='1' fill='%236495ED'/%3E%3Crect x='5' y='9' width='14' height='1' fill='%236495ED'/%3E%3Crect x='6' y='10' width='12' height='1' fill='%236495ED'/%3E%3C!-- Face Features (Eyes - Black, Nose - Dark Blue) --%3E%3Crect x='7' y='4' width='2' height='1' fill='%23000000'/%3E%3Crect x='15' y='4' width='2' height='1' fill='%23000000'/%3E%3Crect x='10' y='7' width='4' height='1' fill='%234682B4'/%3E%3Crect x='11' y='8' width='2' height='1' fill='%234682B4'/%3E%3C!-- Chin Area (Light Blue) --%3E%3Crect x='8' y='6' width='3' height='1' fill='%2387CEFA'/%3E%3Crect x='13' y='6' width='3' height='1' fill='%2387CEFA'/%3E%3Crect x='7' y='7' width='3' height='1' fill='%2387CEFA'/%3E%3Crect x='14' y='7' width='3' height='1' fill='%2387CEFA'/%3E%3Crect x='5' y='8' width='3' height='1' fill='%2387CEFA'/%3E%3Crect x='16' y='8' width='3' height='1' fill='%2387CEFA'/%3E%3C!-- Body (Mid Blue) --%3E%3Crect x='7' y='11' width='10' height='1' fill='%236495ED'/%3E%3Crect x='6' y='12' width='12' height='1' fill='%236495ED'/%3E%3Crect x='6' y='13' width='12' height='1' fill='%236495ED'/%3E%3Crect x='7' y='14' width='10' height='1' fill='%236495ED'/%3E%3Crect x='8' y='15' width='8' height='1' fill='%236495ED'/%3E%3C!-- Body Detail (Light Blue) --%3E%3Crect x='9' y='12' width='6' height='1' fill='%2387CEFA'/%3E%3Crect x='10' y='13' width='4' height='1' fill='%2387CEFA'/%3E%3C!-- Feet/Legs (Dark Blue) --%3E%3Crect x='8' y='16' width='3' height='1' fill='%234682B4'/%3E%3Crect x='13' y='16' width='3' height='1' fill='%234682B4'/%3E%3Crect x='9' y='17' width='1' height='1' fill='%234682B4'/%3E%3Crect x='14' y='17' width='1' height='1' fill='%234682B4'/%3E%3C/svg%3E";
+
+        // Angel SVG Data URL (Simplified 24x24 Pink version)
+        // Colors: #FFC0CB (Pink), #FF69B4 (HotPink), #FF1493 (DeepPink), #000000 (Black)
+        const angelSvgData = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' shape-rendering='crispEdges'%3E%3C!-- Antennae --%3E%3Crect x='9' y='0' width='1' height='2' fill='%23FF69B4'/%3E%3Crect x='14' y='0' width='1' height='2' fill='%23FF69B4'/%3E%3Crect x='8' y='1' width='1' height='1' fill='%23FF1493'/%3E%3Crect x='15' y='1' width='1' height='1' fill='%23FF1493'/%3E%3C!-- Ears Outline (Deep Pink) --%3E%3Crect x='6' y='1' width='1' height='1' fill='%23FF1493'/%3E%3Crect x='5' y='2' width='1' height='1' fill='%23FF1493'/%3E%3Crect x='4' y='3' width='1' height='2' fill='%23FF1493'/%3E%3Crect x='3' y='5' width='1' height='3' fill='%23FF1493'/%3E%3Crect x='4' y='8' width='1' height='1' fill='%23FF1493'/%3E%3Crect x='17' y='1' width='1' height='1' fill='%23FF1493'/%3E%3Crect x='18' y='2' width='1' height='1' fill='%23FF1493'/%3E%3Crect x='19' y='3' width='1' height='2' fill='%23FF1493'/%3E%3Crect x='20' y='5' width='1' height='3' fill='%23FF1493'/%3E%3Crect x='19' y='8' width='1' height='1' fill='%23FF1493'/%3E%3C!-- Ears Inner (Hot Pink) --%3E%3Crect x='7' y='2' width='1' height='1' fill='%23FF69B4'/%3E%3Crect x='6' y='3' width='2' height='1' fill='%23FF69B4'/%3E%3Crect x='5' y='4' width='3' height='2' fill='%23FF69B4'/%3E%3Crect x='4' y='6' width='3' height='2' fill='%23FF69B4'/%3E%3Crect x='16' y='2' width='1' height='1' fill='%23FF69B4'/%3E%3Crect x='16' y='3' width='2' height='1' fill='%23FF69B4'/%3E%3Crect x='16' y='4' width='3' height='2' fill='%23FF69B4'/%3E%3Crect x='17' y='6' width='3' height='2' fill='%23FF69B4'/%3E%3C!-- Head Top (Pink) --%3E%3Crect x='8' y='2' width='8' height='1' fill='%23FFC0CB'/%3E%3C!-- Head Main (Pink) --%3E%3Crect x='5' y='3' width='1' height='1' fill='%23FFC0CB'/%3E%3Crect x='8' y='3' width='8' height='1' fill='%23FFC0CB'/%3E%3Crect x='18' y='3' width='1' height='1' fill='%23FFC0CB'/%3E%3Crect x='8' y='4' width='8' height='1' fill='%23FFC0CB'/%3E%3Crect x='8' y='5' width='8' height='1' fill='%23FFC0CB'/%3E%3Crect x='7' y='6' width='1' height='1' fill='%23FFC0CB'/%3E%3Crect x='11' y='6' width='2' height='1' fill='%23FFC0CB'/%3E%3Crect x='16' y='6' width='1' height='1' fill='%23FFC0CB'/%3E%3Crect x='7' y='7' width='1' height='1' fill='%23FFC0CB'/%3E%3Crect x='10' y='7' width='4' height='1' fill='%23FFC0CB'/%3E%3Crect x='16' y='7' width='1' height='1' fill='%23FFC0CB'/%3E%3Crect x='5' y='8' width='3' height='1' fill='%23FFC0CB'/%3E%3Crect x='11' y='8' width='2' height='1' fill='%23FFC0CB'/%3E%3Crect x='16' y='8' width='3' height='1' fill='%23FFC0CB'/%3E%3Crect x='6' y='9' width='12' height='1' fill='%23FFC0CB'/%3E%3Crect x='7' y='10' width='10' height='1' fill='%23FFC0CB'/%3E%3C!-- Face Features (Eyes - Black, Nose - Deep Pink) --%3E%3Crect x='8' y='5' width='2' height='1' fill='%23000000'/%3E%3Crect x='14' y='5' width='2' height='1' fill='%23000000'/%3E%3Crect x='11' y='7' width='2' height='1' fill='%23FF1493'/%3E%3C!-- Body (Pink) --%3E%3Crect x='8' y='11' width='8' height='1' fill='%23FFC0CB'/%3E%3Crect x='7' y='12' width='10' height='1' fill='%23FFC0CB'/%3E%3Crect x='7' y='13' width='10' height='1' fill='%23FFC0CB'/%3E%3Crect x='8' y='14' width='8' height='1' fill='%23FFC0CB'/%3E%3Crect x='9' y='15' width='6' height='1' fill='%23FFC0CB'/%3E%3C!-- Body Detail (Hot Pink) --%3E%3Crect x='10' y='12' width='4' height='1' fill='%23FF69B4'/%3E%3Crect x='11' y='13' width='2' height='1' fill='%23FF69B4'/%3E%3C!-- Feet/Legs (Deep Pink) --%3E%3Crect x='9' y='16' width='2' height='1' fill='%23FF1493'/%3E%3Crect x='13' y='16' width='2' height='1' fill='%23FF1493'/%3E%3Crect x='10' y='17' width='1' height='1' fill='%23FF1493'/%3E%3Crect x='13' y='17' width='1' height='1' fill='%23FF1493'/%3E%3C/svg%3E";
+
+        stitchImage.onload = () => { stitchImageLoaded = true; console.log("Stitch image loaded."); };
+        angelImage.onload = () => { angelImageLoaded = true; console.log("Angel image loaded."); };
+
+        stitchImage.src = stitchSvgData;
+        angelImage.src = angelSvgData;
+        // --- End Asset Loading ---
+
+        // --- Utility Functions ---
+        function random(min, max) { return Math.random() * (max - min) + min; }
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+        function isoToScreen(isoX, isoY) { /* ... */ return { x: (isoX - isoY) * isoCos, y: (isoX + isoY) * isoSin }; }
+
+        // --- Canvas Setup ---
+        function resizeCanvas() { /* ... (same as before) ... */
+            const maxWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--canvas-max-width'));
+            const containerWidth = canvas.parentElement.clientWidth;
+            const width = Math.min(maxWidth, containerWidth);
+            const height = width * 0.75;
+            canvas.width = width; canvas.height = height;
+             if (player.x === undefined) { resetPlayer(); }
+             else {
+                player.x = Math.max(playerBaseSize / 2, Math.min(canvas.width - playerBaseSize / 2, player.x));
+                player.y = Math.max(playerBaseSize / 2, Math.min(canvas.height - playerBaseSize / 2, player.y));
+             }
+        }
+
+        // --- Game Object Initialization ---
+        function resetPlayer() {
+            player = {
+                x: canvas.width / 2, y: canvas.height * 0.8,
+                // Use base size for drawing dimensions
+                drawWidth: playerBaseSize * 1.2, // Make sprite slightly larger than collision box
+                drawHeight: playerBaseSize * 1.2,
+                // Collision box based on base size
+                width: playerBaseSize * 0.7, height: playerBaseSize * 0.7,
+                color: playerColor, speed: playerSpeed, dx: 0, dy: 0
+            };
+            player.collisionX = player.x - player.width / 2;
+            player.collisionY = player.y - player.height / 2;
+        }
+
+        function spawnEnemy() {
+            const x = random(enemyBaseSize, canvas.width - enemyBaseSize);
+            const y = -enemyBaseSize;
+            enemies.push({
+                x: x, y: y,
+                // Use base size for drawing dimensions
+                drawWidth: enemyBaseSize * 1.2, drawHeight: enemyBaseSize * 1.2,
+                // Collision box
+                width: enemyBaseSize, height: enemyBaseSize,
+                color: enemyColor, speed: enemySpeed
+            });
+        }
+
+        function fireProjectile() { /* ... (same as before) ... */
+            const now = Date.now();
+            if (now - lastFireTime > fireRate) {
+                projectiles.push({
+                    x: player.x - projectileSize.width / 2,
+                    y: player.y - player.drawHeight / 2, // Fire from top-center of visual
+                    width: projectileSize.width, height: projectileSize.height,
+                    color: projectileColor, speed: projectileSpeed
+                });
+                lastFireTime = now;
+            }
+        }
+
+        // --- Input Handling ---
+        function handleKeyDown(e) { keys[e.key.toLowerCase()] = true; }
+        function handleKeyUp(e) { keys[e.key.toLowerCase()] = false; }
+        function handleTouchStart(e) { e.preventDefault(); isTouching = true; updateTouchMoveDir(e.touches[0].clientX, e.touches[0].clientY); }
+        function handleTouchMove(e) { e.preventDefault(); if (isTouching) { updateTouchMoveDir(e.touches[0].clientX, e.touches[0].clientY); } }
+        function handleTouchEnd(e) { e.preventDefault(); isTouching = false; touchMoveDir = { x: 0, y: 0 }; }
+        function updateTouchMoveDir(touchX, touchY) { /* ... (same as before) ... */
+             if (!isTouching) return;
+            const rect = canvas.getBoundingClientRect(); const touchRelX = touchX - rect.left; const touchRelY = touchY - rect.top;
+            const dx = touchRelX - player.x; const dy = touchRelY - player.y; const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist > playerBaseSize * 0.5) {
+                const angle = Math.atan2(dy, dx); const threshold = Math.PI / 8;
+                if (angle > -threshold && angle <= threshold) touchMoveDir = { x: 1, y: 0 };
+                else if (angle > threshold && angle <= 3 * threshold) touchMoveDir = { x: 1, y: 1 };
+                else if (angle > 3 * threshold && angle <= 5 * threshold) touchMoveDir = { x: 0, y: 1 };
+                else if (angle > 5 * threshold && angle <= 7 * threshold) touchMoveDir = { x: -1, y: 1 };
+                else if (angle > 7 * threshold || angle <= -7 * threshold) touchMoveDir = { x: -1, y: 0 };
+                else if (angle > -7 * threshold && angle <= -5 * threshold) touchMoveDir = { x: -1, y: -1 };
+                else if (angle > -5 * threshold && angle <= -3 * threshold) touchMoveDir = { x: 0, y: -1 };
+                else if (angle > -3 * threshold && angle <= -threshold) touchMoveDir = { x: 1, y: -1 };
+                else touchMoveDir = { x: 0, y: 0 };
+            } else { touchMoveDir = { x: 0, y: 0 }; }
+        }
+
+        // --- Update Logic ---
+        function updatePlayer() { /* ... (same logic, uses player.x/y for center) ... */
+            player.dx = 0; player.dy = 0;
+            if (isTouching) { player.dx = touchMoveDir.x; player.dy = touchMoveDir.y; }
+            else { if (keys['a'] || keys['arrowleft']) player.dx = -1; if (keys['d'] || keys['arrowright']) player.dx = 1; if (keys['w'] || keys['arrowup']) player.dy = -1; if (keys['s'] || keys['arrowdown']) player.dy = 1; }
+            const magnitude = Math.sqrt(player.dx * player.dx + player.dy * player.dy);
+            if (magnitude > 0) { player.x += (player.dx / magnitude) * player.speed; player.y += (player.dy / magnitude) * player.speed; }
+            const visualHalfWidth = player.drawWidth / 2; const visualHalfHeight = player.drawHeight / 2;
+            player.x = Math.max(visualHalfWidth, Math.min(canvas.width - visualHalfWidth, player.x));
+            player.y = Math.max(visualHalfHeight, Math.min(canvas.height - visualHalfHeight, player.y));
+            player.collisionX = player.x - player.width / 2; player.collisionY = player.y - player.height / 2;
+            fireProjectile();
+        }
+        function updateProjectiles() { /* ... (same as before) ... */ for (let i=projectiles.length-1; i>=0; i--) { projectiles[i].y -= projectiles[i].speed; if (projectiles[i].y + projectiles[i].height < 0) { projectiles.splice(i, 1); } } }
+        function updateEnemies() { /* ... (same as before) ... */ const now = Date.now(); if (gameActive && now - lastEnemySpawn > enemySpawnRate) { spawnEnemy(); lastEnemySpawn = now; } for (let i=enemies.length-1; i>=0; i--) { enemies[i].y += enemies[i].speed; if (enemies[i].y > canvas.height) { enemies.splice(i, 1); } } }
+        function handleCollisions() { /* ... (same collision logic using player.collisionX/Y) ... */
+            for (let i=projectiles.length-1; i>=0; i--) { for (let j=enemies.length-1; j>=0; j--) { if (!projectiles[i] || !enemies[j]) continue; if (checkCollision(projectiles[i], enemies[j])) { projectiles.splice(i, 1); enemies.splice(j, 1); score += 10; break; } } }
+            const playerCollisionRect = { x: player.collisionX, y: player.collisionY, width: player.width, height: player.height };
+            for (let i=enemies.length-1; i>=0; i--) { if (checkCollision(playerCollisionRect, enemies[i])) { gameOver(); return; } }
+        }
+        function updateUI() { /* ... (same as before) ... */ scoreElement.textContent = `SCORE: ${score}`; statusElement.textContent = gameActive ? 'STATUS: OK' : 'STATUS: OFFLINE'; }
+
+        // --- Drawing Logic ---
+        function drawPlayer() {
+            // Draw loaded Stitch SVG image if available, else draw placeholder
+            if (stitchImageLoaded) {
+                // Draw centered at player.x, player.y
+                ctx.drawImage(stitchImage,
+                              player.x - player.drawWidth / 2,
+                              player.y - player.drawHeight / 2,
+                              player.drawWidth, player.drawHeight);
+            } else {
+                // Placeholder if image fails/slow load
+                ctx.fillStyle = playerColor;
+                ctx.fillRect(player.collisionX, player.collisionY, player.width, player.height);
+            }
+            // Optional Glow
+            ctx.shadowColor = playerColor; ctx.shadowBlur = 10;
+            ctx.fillStyle = 'rgba(0,0,0,0)';
+            ctx.fillRect(player.collisionX, player.collisionY, player.width, player.height);
+            ctx.shadowBlur = 0;
+        }
+
+        function drawEnemy(enemy) {
+             // Draw loaded Angel SVG image if available, else draw placeholder
+            if (angelImageLoaded) {
+                 // Draw centered at enemy.x, enemy.y
+                 // Note: Enemy x/y in current logic is top-left, adjust drawing
+                 ctx.drawImage(angelImage,
+                               enemy.x - enemy.drawWidth / 2 + enemy.width / 2, // Adjust x to center visual
+                               enemy.y - enemy.drawHeight / 2 + enemy.height / 2, // Adjust y to center visual
+                               enemy.drawWidth, enemy.drawHeight);
+            } else {
+                // Placeholder if image fails/slow load
+                ctx.fillStyle = enemyColor;
+                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+            }
+             // Optional Glow
+            ctx.shadowColor = enemyColor; ctx.shadowBlur = 8;
+            ctx.fillStyle = 'rgba(0,0,0,0)';
+            ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+            ctx.shadowBlur = 0;
+        }
+
+        function drawRect(obj) { /* Projectiles */ ctx.fillStyle = obj.color; ctx.shadowColor = obj.color; ctx.shadowBlur = 5; ctx.fillRect(obj.x, obj.y, obj.width, obj.height); ctx.shadowBlur = 0; }
+        function drawBackground() { /* ... (same as before - draws iso grid) ... */ ctx.fillStyle = '#111'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid-iso-color'); ctx.lineWidth = 1; ctx.beginPath(); const centerX = canvas.width / 2; const centerY = canvas.height * 0.1; const gridRange = Math.max(canvas.width, canvas.height) / tileWidth * 1.5; for (let i=-gridRange; i<=gridRange; i++) { let p1=isoToScreen(i*tileWidth,-gridRange*tileWidth); let p2=isoToScreen(i*tileWidth,gridRange*tileWidth); ctx.moveTo(centerX+p1.x,centerY+p1.y); ctx.lineTo(centerX+p2.x,centerY+p2.y); p1=isoToScreen(-gridRange*tileWidth,i*tileWidth); p2=isoToScreen(gridRange*tileWidth,i*tileWidth); ctx.moveTo(centerX+p1.x,centerY+p1.y); ctx.lineTo(centerX+p2.x,centerY+p2.y); } ctx.stroke(); }
+
+        function draw() {
+            ctx.fillStyle = '#111'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+            projectiles.forEach(drawRect);
+            // Call drawEnemy for each enemy
+            enemies.forEach(drawEnemy);
+            drawPlayer();
+            ctx.shadowBlur = 0;
+        }
+
+        // --- Game Loop ---
+        function gameLoop() { /* ... (same as before) ... */ if (!gameActive) return; updatePlayer(); updateProjectiles(); updateEnemies(); handleCollisions(); updateUI(); draw(); animationFrameId = requestAnimationFrame(gameLoop); }
+        function gameOver() { /* ... (same as before) ... */ gameActive = false; if (animationFrameId) cancelAnimationFrame(animationFrameId); statusElement.textContent = 'STATUS: CRITICAL ERROR'; alert(`Game Over! Final Score: ${score}`); }
+
+        // --- Initialization ---
+        function init() { /* ... (same as before) ... */
+            resizeCanvas(); resetPlayer(); projectiles = []; enemies = []; score = 0; lastFireTime = 0; lastEnemySpawn = 0; gameActive = true; keys = {}; touchMoveDir = { x: 0, y: 0 }; isTouching = false;
+            window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); canvas.removeEventListener('touchstart', handleTouchStart); canvas.removeEventListener('touchmove', handleTouchMove); canvas.removeEventListener('touchend', handleTouchEnd); window.removeEventListener('resize', resizeCanvas);
+            window.addEventListener('keydown', handleKeyDown); window.addEventListener('keyup', handleKeyUp); canvas.addEventListener('touchstart', handleTouchStart, { passive: false }); canvas.addEventListener('touchmove', handleTouchMove, { passive: false }); canvas.addEventListener('touchend', handleTouchEnd, { passive: false }); window.addEventListener('resize', resizeCanvas);
+            if (animationFrameId) cancelAnimationFrame(animationFrameId); gameLoop();
+        }
+
+        // --- Start ---
+        // Wait for images to potentially load before first draw, or handle drawing placeholders
+        init(); // Call init directly, drawing functions will handle unloaded images
+
+    </script>
+
+</body>
+</html>
