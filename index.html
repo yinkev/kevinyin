@@ -3,14 +3,308 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Full Name - Welcome!</title> <!-- CHANGE THIS TITLE! -->
+    <title>Hiiii // System Online</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
+
     <style>
-        /* Basic styling - you'll want a separate CSS file later! */
-        body { font-family: sans-serif; text-align: center; padding-top: 50px; }
+        /* Define CSS Variables */
+        :root {
+            --bg-color: #0a0a1a;
+            --neon-pink: #ff00ff;
+            --neon-cyan: #00ffff;
+            --neon-green: #39ff14;
+            --text-color: #e0e0e0;
+            --scanline-color: rgba(0, 0, 0, 0.2);
+            --grid-color: rgba(0, 255, 255, 0.05); /* Faint cyan grid */
+            --glitch-color-1: var(--neon-pink);
+            --glitch-color-2: var(--neon-cyan);
+            --mouse-x: 50%; /* For mouse glow */
+            --mouse-y: 50%; /* For mouse glow */
+            --grid-bg-size: 40px; /* Grid size */
+        }
+
+        /* Base styles */
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'IBM Plex Mono', monospace;
+            overflow: hidden;
+            min-height: 100vh;
+            perspective: 1000px;
+        }
+
+        /* Fonts */
+        h1, .font-display { font-family: 'Press Start 2P', cursive; }
+
+        /* --- Background Layers --- */
+
+        /* Scanline Overlay (Topmost) */
+        .scanline-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(0deg, var(--scanline-color), var(--scanline-color) 1px, transparent 1px, transparent 3px);
+            pointer-events: none; z-index: 100; opacity: 0.5;
+            animation: scanline-flicker 12s infinite linear;
+        }
+        @keyframes scanline-flicker { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.4; } }
+
+        /* Mouse Glow (On Body via Pseudo-element - Behind Content) */
+        body::before {
+            content: ''; position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle 400px at var(--mouse-x) var(--mouse-y), rgba(0, 255, 255, 0.06), transparent);
+            z-index: -1; /* Behind grid and content */
+            pointer-events: none;
+            transition: background 0.2s ease-out;
+        }
+
+        /* Parallax Grid Background (Behind Glow) */
+        #grid-background {
+            position: fixed;
+            top: -5%; left: -5%;
+            width: 110%; height: 110%;
+            background-image:
+                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+            background-size: var(--grid-bg-size) var(--grid-bg-size);
+            z-index: -2; /* Behind mouse glow */
+            pointer-events: none;
+            transition: transform 0.15s ease-out; /* Keep transition for smoothness */
+        }
+
+        /* Floating Background Particles (Bottommost) */
+        .particles { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: -3; }
+        .particle {
+            position: absolute; background-color: var(--neon-cyan); opacity: 0;
+            width: 2px; height: 2px; border-radius: 50%;
+            box-shadow: 0 0 4px var(--neon-cyan);
+            animation: float 20s infinite linear;
+        }
+        .particle:nth-child(1) { top: 10%; left: 20%; animation-delay: 0s; animation-duration: 18s; }
+        .particle:nth-child(2) { top: 50%; left: 80%; animation-delay: 1s; animation-duration: 22s; }
+        .particle:nth-child(3) { top: 80%; left: 10%; animation-delay: 2s; animation-duration: 25s; }
+        .particle:nth-child(4) { top: 30%; left: 50%; animation-delay: 3s; animation-duration: 15s; }
+        .particle:nth-child(5) { top: 60%; left: 30%; animation-delay: 4s; animation-duration: 28s; }
+        .particle:nth-child(6) { top: 90%; left: 90%; animation-delay: 5s; animation-duration: 19s; }
+        .particle:nth-child(7) { top: 5%; left: 5%; animation-delay: 6s; animation-duration: 24s; }
+        .particle:nth-child(8) { top: 70%; left: 65%; animation-delay: 7s; animation-duration: 16s; }
+        .particle:nth-child(9) { top: 25%; left: 85%; animation-delay: 8s; animation-duration: 30s; }
+        .particle:nth-child(10){ top: 45%; left: 15%; animation-delay: 9s; animation-duration: 21s; }
+        .particle:nth-child(11){ top: 75%; left: 40%; animation-delay: 10s; animation-duration: 17s; }
+        .particle:nth-child(12){ top: 15%; left: 70%; animation-delay: 11s; animation-duration: 26s; }
+
+
+        @keyframes float {
+            0% { transform: translateY(0) translateX(0); opacity: 0; }
+            10%, 90% { opacity: 0.4; }
+            100% { transform: translateY(-100vh) translateX(15vw) rotate(30deg); opacity: 0; }
+        }
+
+        /* --- Foreground Content --- */
+
+        /* Main Content Screen Container (For Parallax) */
+        .screen-container {
+            transition: transform 0.1s ease-out;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Content Screen Styling */
+        .screen-content {
+            border: 2px solid var(--neon-cyan);
+            box-shadow: 0 0 15px var(--neon-cyan) inset, 0 0 15px var(--neon-cyan);
+            background-color: rgba(10, 10, 26, 0.75);
+            backdrop-filter: blur(3px);
+            animation: border-flicker 4s infinite linear alternate;
+            position: relative;
+            transform: rotateY(0deg) rotateX(0deg);
+            transition: transform 0.1s ease-out;
+            overflow: hidden;
+        }
+        @keyframes border-flicker { 0%{box-shadow:0 0 15px var(--neon-cyan) inset,0 0 15px var(--neon-cyan),0 0 25px var(--neon-cyan);opacity:1}50%{box-shadow:0 0 10px var(--neon-cyan) inset,0 0 10px var(--neon-cyan),0 0 15px var(--neon-cyan);opacity:.8}100%{box-shadow:0 0 15px var(--neon-cyan) inset,0 0 15px var(--neon-cyan),0 0 25px var(--neon-cyan);opacity:1} }
+
+        /* Neon Text Glows */
+        .text-glow-cyan { color: var(--neon-cyan); text-shadow: 0 0 5px var(--neon-cyan), 0 0 10px var(--neon-cyan), 0 0 15px var(--neon-cyan); }
+        .text-glow-pink { color: var(--neon-pink); text-shadow: 0 0 5px var(--neon-pink), 0 0 10px var(--neon-pink); }
+
+        /* Glitch effect - Base style */
+        .glitch-text { position: relative; }
+        .glitch-text.glitching { animation: glitch-skew 0.1s 2 linear alternate-reverse; }
+        .glitch-text.glitching::before,
+        .glitch-text.glitching::after {
+            content: attr(data-text); position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 10, 26, 0.75);
+            overflow: hidden;
+        }
+        .glitch-text.glitching::before { left: 2px; text-shadow: -2px 0 var(--glitch-color-1); animation: glitch-anim-1 0.5s infinite linear alternate-reverse; }
+        .glitch-text.glitching::after { left: -2px; text-shadow: -2px 0 var(--glitch-color-2), 2px 2px var(--glitch-color-2); animation: glitch-anim-2 0.4s infinite linear alternate-reverse; }
+        @keyframes glitch-anim-1 { 0%{clip:rect(4px,9999px,9px,0)}20%{clip:rect(18px,9999px,99px,0)}40%{clip:rect(50px,9999px,102px,0)}60%{clip:rect(80px,9999px,50px,0)}80%{clip:rect(30px,9999px,80px,0)}100%{clip:rect(91px,9999px,98px,0)} }
+        @keyframes glitch-anim-2 { 0%{clip:rect(78px,9999px,11px,0)}20%{clip:rect(80px,9999px,60px,0)}40%{clip:rect(25px,9999px,70px,0)}60%{clip:rect(45px,9999px,130px,0)}80%{clip:rect(140px,9999px,70px,0)}100%{clip:rect(60px,9999px,1px,0)} }
+        @keyframes glitch-skew { 0% { transform: skew(1deg) } 100% { transform: skew(-1deg) } }
+
+
+        /* Improved GIF container */
+        .gif-container {
+            border: 2px solid var(--neon-pink); padding: 4px; background: #000;
+            box-shadow: 0 0 8px var(--neon-pink), 0 0 12px var(--neon-pink) inset;
+            max-width: 200px;
+        }
+        .gif-container img { display: block; width: 100%; height: auto; }
+
+        /* Link styling */
+        .link-style { color: var(--neon-green); text-decoration: none; transition: all 0.2s ease; position: relative; padding-bottom: 2px; }
+        .link-style::after { content: ''; position: absolute; width: 0; height: 1px; display: block; margin-top: 1px; right: 0; background: var(--neon-green); transition: width 0.3s ease; }
+        .link-style:hover::after { width: 100%; left: 0; background: var(--neon-green); }
+        .link-style:hover { text-shadow: 0 0 5px var(--neon-green); }
+
+        /* Typing cursor */
+        .typing-effect::after { content: '_'; opacity: 1; animation: blink 1s infinite; margin-left: 2px; color: var(--neon-cyan); }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
     </style>
 </head>
-<body>
-    <h1>Welcome to My Website!</h1> <!-- CHANGE THIS! -->
-    <p>Created locally using VS Code!</p>
+<body class="flex items-center justify-center min-h-screen p-4 sm:p-6">
+
+    <div class="scanline-overlay"></div>
+
+    <div class="particles">
+        <div class="particle"></div> <div class="particle"></div> <div class="particle"></div>
+        <div class="particle"></div> <div class="particle"></div> <div class="particle"></div>
+        <div class="particle"></div> <div class="particle"></div> <div class="particle"></div>
+        <div class="particle"></div> <div class="particle"></div> <div class="particle"></div>
+    </div>
+
+    <div id="grid-background"></div>
+
+    <div class="screen-container max-w-3xl w-full z-10 relative">
+        <main class="screen-content p-6 sm:p-8 rounded-lg text-center">
+
+            <header class="mb-6">
+                <h1 id="main-heading" class="text-3xl sm:text-4xl text-glow-cyan glitch-text inline-block cursor-pointer" data-text="Hiiii">
+                    Hiiii
+                </h1>
+                <p class="text-sm sm:text-base text-glow-pink font-display mt-2">
+                    ahhhhhhhhhh
+                </p>
+            </header>
+
+            <section class="flex flex-col md:flex-row items-center md:items-start gap-6 mb-6">
+                <div class="text-left md:w-2/3">
+                    <p id="bio-text" class="text-sm sm:text-base leading-relaxed mb-4">
+                        </p>
+                </div>
+
+                <div class="gif-container rounded overflow-hidden md:w-1/3 flex-shrink-0 mx-auto md:mx-0">
+                    <img
+                        src="https://www.icegif.com/wp-content/uploads/2023/11/icegif-71.gif"
+                        alt="Cyberpunk animation"
+                        onerror="this.style.display='none'"
+                    />
+                </div>
+            </section>
+
+            <footer class="border-t border-[var(--neon-cyan)] border-opacity-30 pt-4">
+                <nav class="flex items-center justify-center space-x-4 sm:space-x-6">
+                    <a href="./index.html" class="link-style">[ Home ]</a>
+                    <a href="experiment.html" class="link-style">[ Experiment ]</a>
+                </nav>
+            </footer>
+
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const body = document.body;
+            const screenContainer = document.querySelector('.screen-container');
+            const gridBackground = document.getElementById('grid-background');
+            const mainHeading = document.getElementById('main-heading');
+            const bioTextElement = document.getElementById('bio-text');
+
+            // --- Config ---
+            const parallaxIntensity = 0.015;
+            const gridParallaxIntensity = -0.01;
+            const gridRotateIntensity = 0.005;
+            const typingSpeed = 100; // Slowed down slightly more for symbols
+            // <<< ADJUSTED: New purely symbolic/hieroglyphic text
+            const alienText = "> ╬╫░▒▓ ±∞∴∵§¶\n> ∫≈∑∆√⊕⊗ øπ Σψμβολσ\n> Ξ//Δο≈Ξ?∴§¶∝╬╫";
+            let glitchTimeout = null;
+
+            // --- Mouse Glow Effect (Uses body::before) ---
+            body.addEventListener('mousemove', (e) => {
+                body.style.setProperty('--mouse-x', `${e.clientX}px`);
+                body.style.setProperty('--mouse-y', `${e.clientY}px`);
+            });
+
+            // --- Parallax Effect ---
+            body.addEventListener('mousemove', (e) => {
+                const centerX = window.innerWidth / 2;
+                const centerY = window.innerHeight / 2;
+                const offsetX = (e.clientX - centerX);
+                const offsetY = (e.clientY - centerY);
+
+                screenContainer.style.transform = `translate(${offsetX * parallaxIntensity * 0.5}px, ${offsetY * parallaxIntensity * 0.5}px) rotateY(${offsetX * parallaxIntensity * -0.5}deg) rotateX(${offsetY * parallaxIntensity * 0.5}deg)`;
+
+                if (gridBackground) {
+                    gridBackground.style.transform = `translate(${offsetX * gridParallaxIntensity}px, ${offsetY * gridParallaxIntensity}px) rotateZ(${offsetX * gridRotateIntensity}deg)`;
+                }
+            });
+            body.addEventListener('mouseleave', () => {
+                 screenContainer.style.transform = 'translate(0,0) rotateY(0deg) rotateX(0deg)';
+                 if (gridBackground) {
+                    gridBackground.style.transform = 'translate(0,0) rotateZ(0deg)';
+                 }
+            });
+
+            // --- Text Typing Effect ---
+            function typeWriter(text, element, speed, callback) {
+                let i = 0;
+                if (!element) {
+                    console.error("Target element for typing effect not found.");
+                    return;
+                }
+                element.innerHTML = ''; // Start fresh
+                element.classList.add('typing-effect');
+                function type() {
+                    if (i < text.length) {
+                        if (text.charAt(i) === '\n') {
+                            element.innerHTML += '<br>';
+                        } else {
+                            element.innerHTML += text.charAt(i);
+                        }
+                        i++;
+                        setTimeout(type, speed);
+                    } else {
+                        element.classList.remove('typing-effect');
+                        if (callback) callback();
+                    }
+                }
+                type();
+            }
+
+            // Start typing alien text (uses updated alienText)
+            typeWriter(alienText, bioTextElement, typingSpeed);
+
+
+            // --- Interactive Glitch Effect ---
+             if(mainHeading) {
+                mainHeading.addEventListener('mouseenter', () => {
+                    if (glitchTimeout) clearTimeout(glitchTimeout);
+                    mainHeading.classList.add('glitching');
+                    glitchTimeout = setTimeout(() => {
+                        mainHeading.classList.remove('glitching');
+                    }, 600);
+                });
+             } else {
+                 console.error("Main heading element not found for glitch effect.");
+             }
+
+        });
+    </script>
+
 </body>
 </html>
